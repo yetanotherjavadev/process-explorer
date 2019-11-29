@@ -6,13 +6,15 @@ import com.paka.processexplorer.mappers.ProcessMapper;
 import com.paka.processexplorer.model.ProcessDTO;
 import com.paka.processexplorer.service.ProcessService;
 import com.paka.processexplorer.service.ScheduledService;
+import org.jutils.jprocesses.JProcesses;
+import org.jutils.jprocesses.model.JProcessesResponse;
 import org.jutils.jprocesses.model.ProcessInfo;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,12 +37,19 @@ public class ProcessController {
 		this.simpMessagingTemplate = simpMessagingTemplate;
 	}
 
-	@MessageMapping("/greetings")
-	public void greet(String greeting) {
-		System.out.println("Greeting for " + greeting);
+	@MessageMapping("/kill-process/{pid}")
+	public void killProcess(@DestinationVariable String pid) {
+		System.out.println("Request to kill process: " + pid);
 
-		String text = "[" + Instant.now() + "]: " + greeting;
-		this.simpMessagingTemplate.convertAndSend("/topic/greetings", text);
+		// TODO: move to process service
+//		JProcessesResponse response = JProcesses.killProcess(Integer.valueOf(pid));
+//		if (response.isSuccess()) {
+		if (Math.random() > 0.001) {
+			processService.updateTopList(pid);
+			this.simpMessagingTemplate.convertAndSend("/topic/kill-successful", "Kill successful: " + pid);
+		} else {
+			this.simpMessagingTemplate.convertAndSend("/topic/kill-failed", "Kill failed: " + pid);
+		}
 	}
 
 	@MessageMapping("/get-processes") // good old rest representation
@@ -55,7 +64,7 @@ public class ProcessController {
 	}
 
 	@MessageMapping("/get-processes/{id}")
-	public void getProcessById(String pid) throws JsonProcessingException {
+	public void getProcessById(@DestinationVariable String pid) throws JsonProcessingException {
 		System.out.println("Request for getting process with id: " + pid);
 
 		Optional<ProcessInfo> processInfo = processService.getProcessById(pid);

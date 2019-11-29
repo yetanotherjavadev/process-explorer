@@ -31,9 +31,7 @@ public class ScheduledService {
 	@Scheduled(fixedRate = 1000)
 	public void poll() throws JsonProcessingException {
 		if (processesPollStarted) {
-			processService.getSystemProcessesShort();
-
-			List<ProcessInfo> processesList = processService.getSystemProcessesShort(); // limited to 5 processes
+			List<ProcessInfo> processesList = processService.getTrackedProcessesInfo(); // limited to 10 processes so far
 			List<ProcessDTO> processDTOs = processMapper.mapProcessesToProcessDto(processesList);
 
 			String processesListStr = objectMapper.writeValueAsString(processDTOs);

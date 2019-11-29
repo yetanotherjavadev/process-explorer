@@ -20,7 +20,8 @@ public class ProcessMapper {
 		processDTO.setCpuPercentage(processInfo.getCpuUsage());
 		processDTO.setExecutionPath(processInfo.getCommand());
 		processDTO.setCreationDate(processInfo.getStartTime());
-		processDTO.setState("running");
+		processDTO.setName(processInfo.getName());
+		processDTO.setState("running"); // necessity is questionable
 		return processDTO;
 	}
 }
