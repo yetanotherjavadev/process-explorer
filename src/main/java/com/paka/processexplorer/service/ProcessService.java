@@ -1,7 +1,12 @@
 package com.paka.processexplorer.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.paka.processexplorer.mappers.ProcessMapper;
+import com.paka.processexplorer.model.ProcessDTO;
 import org.jutils.jprocesses.JProcesses;
 import org.jutils.jprocesses.model.ProcessInfo;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -12,18 +17,12 @@ import java.util.stream.Collectors;
 @Service
 public class ProcessService {
 
-	private final int NO_OF_TRACKED_PROCESSES = 5;
+
+	private final int NO_OF_TRACKED_PROCESSES = 10;
 	private List<String> topConsumingProcessesIds;
 
-	/**
-	 * Gets all system processes
-	 *
-	 * @return list of {@link ProcessInfo} reflecting all processes that are currently running
-	 */
-	public List<ProcessInfo> getSystemProcesses() {
-		List<ProcessInfo> processesList = JProcesses.getProcessList();
-		return processesList;
-	}
+	@Autowired
+	ProcessMapper processMapper;
 
 	/**
 	 * Gets a process with given ID
@@ -104,4 +103,5 @@ public class ProcessService {
 		topConsumingProcessesIds.add(newTrackedProcess.getPid());
 		trackedProcessesInfo.add(newTrackedProcess); // new one comes in here
 	}
+
 }

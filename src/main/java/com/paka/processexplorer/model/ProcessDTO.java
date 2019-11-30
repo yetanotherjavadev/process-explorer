@@ -11,9 +11,11 @@ import java.io.Serializable;
 @Getter
 public class ProcessDTO implements Serializable {
 	private String pid;
+	private String name;
 	private String cpuPercentage;
-	private String state;
 	private String creationDate;
 	private String executionPath;
-	private String name;
+	private String physicalMemory;
+	private String virtualMemory;
+	private String time;
 }

@@ -14,14 +14,16 @@ public class ProcessMapper {
 		return processInfoList.stream().map(this::fromProcessInfo).collect(Collectors.toList());
 	}
 
-	public ProcessDTO fromProcessInfo(ProcessInfo processInfo) {
+	private ProcessDTO fromProcessInfo(ProcessInfo processInfo) {
 		ProcessDTO processDTO = new ProcessDTO();
 		processDTO.setPid(processInfo.getPid());
 		processDTO.setCpuPercentage(processInfo.getCpuUsage());
 		processDTO.setExecutionPath(processInfo.getCommand());
 		processDTO.setCreationDate(processInfo.getStartTime());
+		processDTO.setPhysicalMemory(processInfo.getPhysicalMemory());
+		processDTO.setTime(processInfo.getTime());
+		processDTO.setVirtualMemory(processInfo.getVirtualMemory());
 		processDTO.setName(processInfo.getName());
-		processDTO.setState("running"); // necessity is questionable
 		return processDTO;
 	}
 }
