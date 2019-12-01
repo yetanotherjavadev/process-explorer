@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Converts internal process description classes to DTOs.
+ */
 @Component
 public class ProcessMapper {
 

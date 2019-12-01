@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paka.processexplorer.mappers.ProcessMapper;
 import com.paka.processexplorer.model.ProcessDTO;
+import com.paka.processexplorer.model.ProcessInfoBatch;
 import com.paka.processexplorer.service.ProcessService;
 import org.jutils.jprocesses.JProcesses;
 import org.jutils.jprocesses.model.JProcessesResponse;
@@ -20,12 +21,13 @@ import java.util.List;
 @Controller
 public class ProcessController {
 
-	private boolean pollingActive;
+	private boolean isPollingActive;
 	private final SimpMessagingTemplate simpMessagingTemplate;
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	@Autowired
 	ProcessService processService;
+
 	@Autowired
 	ProcessMapper processMapper;
 
@@ -33,6 +35,16 @@ public class ProcessController {
 		this.simpMessagingTemplate = simpMessagingTemplate;
 	}
 
+	/**
+	 * Tries to force kill a process with "-9" param.
+	 *
+	 * In case if the process was successfully killed:
+	 *  1) Takes the top cpu consuming process from those which were not yet tracked.
+	 *  2) sends "success" message to the client.
+	 *
+	 * If kill command failed just sends appropriate message to the client.
+	 * @param pid - process ID
+	 */
 	@MessageMapping("/kill-process/{pid}")
 	public void killProcess(@DestinationVariable String pid) {
 		System.out.println("Request to kill process: " + pid);
@@ -50,22 +62,30 @@ public class ProcessController {
 
 	@MessageMapping("/start-process-polling")
 	public void startPolling() {
-		this.pollingActive = true;
+		this.isPollingActive = true;
 	}
 
 	@MessageMapping("/stop-process-polling")
 	public void stopPolling() {
-		this.pollingActive = false;
+		this.isPollingActive = false;
 	}
 
+	/**
+	 * Every second pushes a message with currently "tracked" processes.
+	 * "Tracked" processes are usually those which consume the most of CPU time.
+	 *
+	 * @throws JsonProcessingException - just to be sure :)
+	 */
 	@Scheduled(fixedDelay = 1000)
 	public void poll() throws JsonProcessingException {
-		if (pollingActive) {
-			List<ProcessInfo> processesList = processService.getTrackedProcessesInfo(); // limited to 10 processes so far
+		if (isPollingActive) {
+			List<ProcessInfo> processesList = processService.getTrackedProcessesInfo();
 			List<ProcessDTO> processDTOs = processMapper.mapProcessesToProcessDto(processesList);
-
-			String processesListStr = objectMapper.writeValueAsString(processDTOs);
-			this.simpMessagingTemplate.convertAndSend("/topic/processes", processesListStr);
+			ProcessInfoBatch batch = new ProcessInfoBatch();
+			batch.setProcesses(processDTOs);
+			batch.setCurrentTime(System.currentTimeMillis());
+			String processesBatchStr = objectMapper.writeValueAsString(batch);
+			this.simpMessagingTemplate.convertAndSend("/topic/processes", processesBatchStr);
 		}
 	}
 }

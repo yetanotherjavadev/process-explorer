@@ -6,9 +6,12 @@ import lombok.Setter;
 
 import java.io.Serializable;
 
-@NoArgsConstructor
+/**
+ * Simplified version of a Process description object.
+ */
 @Setter
 @Getter
+@NoArgsConstructor
 public class ProcessDTO implements Serializable {
 	private String pid;
 	private String name;
