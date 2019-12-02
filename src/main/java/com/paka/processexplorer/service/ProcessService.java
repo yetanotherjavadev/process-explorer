@@ -1,6 +1,9 @@
 package com.paka.processexplorer.service;
 
 import com.paka.processexplorer.mappers.ProcessMapper;
+import com.paka.processexplorer.model.ProcessDTO;
+import com.paka.processexplorer.model.ProcessesData;
+import com.paka.processexplorer.model.SystemInfo;
 import org.jutils.jprocesses.JProcesses;
 import org.jutils.jprocesses.model.ProcessInfo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,30 +11,20 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 public class ProcessService {
 
-
-	private final int NO_OF_TRACKED_PROCESSES = 10;
-	private List<String> topConsumingProcessesIds;
-
-	@Autowired
-	ProcessMapper processMapper;
+	private final int MAX_UI_PROCESSES = 10; // max no of trackedProcesses that will ever reach UI
 
 	/**
-	 * Gets a process with given ID
-	 *
-	 * @param pid - process ID
-	 * @return Optional with process with give ID if it exists and Optional(null) otherwise
+	 * A list of processes that are tracked from the client side (ones that are shown on the chart)
 	 */
-	public Optional<ProcessInfo> getProcessById(String pid) {
-		List<ProcessInfo> processesList = JProcesses.getProcessList();
-		List<ProcessInfo> filtered = processesList.stream().filter((processInfo -> processInfo.getPid().equals(pid))).collect(Collectors.toList());
-		return Optional.of(filtered.get(0));
-	}
+	private List<String> uiProcessesIds;
+
+	@Autowired
+	private ProcessMapper processMapper;
 
 	/**
 	 * Kills a process with given Id
@@ -44,64 +37,84 @@ public class ProcessService {
 		return success;
 	}
 
-	// bakes the list of processes into array of ids
-	private void updateTopConsumingProcessesList(List<ProcessInfo> processInfos) {
-		topConsumingProcessesIds = processInfos.stream().map(ProcessInfo::getPid).collect(Collectors.toList());
+	/**
+	 * Maps the list of trackedProcesses into array of ids and stores
+	 * it into "UI tracked processes list"
+	 *
+	 * This method should be called only once
+	 */
+	private void updateTrackingList(List<ProcessInfo> processInfos) {
+		uiProcessesIds = processInfos.stream().sorted(Comparator.comparing(o -> -Double.valueOf(o.getCpuUsage())))
+				.limit(MAX_UI_PROCESSES).map(ProcessInfo::getPid).collect(Collectors.toList());
 	}
 
 	/**
-	 * Gets top-X processes by cpuUsage (should be done once)
+	 * Gets updated information on tracked trackedProcesses and current system state data.
 	 */
-	public List<ProcessInfo> getTopConsumingProcesses() {
-		List<ProcessInfo> allProcessesList = JProcesses.getProcessList();
-		List<ProcessInfo> topProcesses = allProcessesList.stream().sorted(Comparator.comparing(o -> -Double.valueOf(o.getCpuUsage())))
-				.limit(NO_OF_TRACKED_PROCESSES).collect(Collectors.toList());
+	private ProcessesData getProcessData() {
+		ProcessesData data = new ProcessesData();
 
-		updateTopConsumingProcessesList(topProcesses);
+		List<ProcessInfo> allSystemProcessesList = JProcesses.getProcessList();
 
-		return topProcesses;
-	}
-
-	/**
-	 * Gets updated information on tracked processes.
-	 */
-	public List<ProcessInfo> getTrackedProcessesInfo() {
-		List<ProcessInfo> trackedProcessesInfo;
-		if (topConsumingProcessesIds == null) {
-			trackedProcessesInfo = getTopConsumingProcesses();
-		} else {
-			List<ProcessInfo> allProcessesList = JProcesses.getProcessList();
-			trackedProcessesInfo = allProcessesList.stream().filter(processInfo ->
-					topConsumingProcessesIds.stream().anyMatch((id) -> processInfo.getPid().equals(id))
-			).collect(Collectors.toList());
+		if (uiProcessesIds == null) { // this is called only once
+			updateTrackingList(allSystemProcessesList);
 		}
 
-		return trackedProcessesInfo;
+		List<ProcessInfo> uiProcesses = allSystemProcessesList.stream().filter(processInfo ->
+			uiProcessesIds.stream().anyMatch((id) -> processInfo.getPid().equals(id))
+		).collect(Collectors.toList());
+
+		double cpuUsageSum = allSystemProcessesList.stream().mapToDouble(p -> Double.valueOf(p.getCpuUsage())).sum();
+
+		data.setOverallCpuUsage(cpuUsageSum);
+		data.setTrackedProcesses(allSystemProcessesList);
+		data.setUiProcesses(uiProcesses);
+
+		return data;
+	}
+
+	public SystemInfo getCurrentSystemInfo() {
+		ProcessesData data = getProcessData();
+		List<ProcessDTO> trackedProcesses = processMapper.mapProcessesToProcessDto(data.getTrackedProcesses());
+		List<ProcessDTO> uiProcesses = processMapper.mapProcessesToProcessDto(data.getUiProcesses());
+
+		SystemInfo sysInfo = new SystemInfo();
+		sysInfo.setTrackedProcesses(trackedProcesses);
+		sysInfo.setUiProcesses(uiProcesses);
+		sysInfo.setCurrentTime(System.currentTimeMillis());
+		sysInfo.setOverallCpuUsage(data.getOverallCpuUsage());
+
+		return sysInfo;
 	}
 
 	/**
-	 * In case we kill a process we need to add one more to the list of top CPU-consuming processes but the rest should
-	 * remain in the tracked processes list.
+	 * In case we kill a process we need to:
+	 * 1) remove that pid from topConsumingProcessesIds
+	 * 2) remove that pid from uiProcessesIds
+	 * 3) grab current running processes and put the top-consuming one which is not yet tracked to the tracked list
+	 * 4) if the killed one was in uiProcessesIds - do the same for it
+	 *
 	 */
 	public void updateTopList(String killedProcessId) {
-		// remove killed process id from the tracked ones
-		topConsumingProcessesIds.remove(killedProcessId);
-
-		// go through all processes excluding the stored ones and take the top consuming
+		// go through all processes and take the top CPU-consuming one
 		List<ProcessInfo> allProcessesList = JProcesses.getProcessList();
-		List<ProcessInfo> trackedProcessesInfo = allProcessesList.stream().filter(processInfo ->
-				topConsumingProcessesIds.stream().anyMatch((id) -> processInfo.getPid().equals(id))
-		).collect(Collectors.toList()); // the result will have (NO_OF_TRACKED_PROCESSES - 1) items now
 
 		List<ProcessInfo> topCpuConsumingNonTrackedProcess = allProcessesList.stream().filter(processInfo ->
-				topConsumingProcessesIds.stream().noneMatch((id) -> processInfo.getPid().equals(id))
+				uiProcessesIds.stream().noneMatch((id) -> processInfo.getPid().equals(id))
 		).sorted(Comparator.comparing(o -> -Double.valueOf(o.getCpuUsage())))
 				.limit(1).collect(Collectors.toList());
 
-		ProcessInfo newTrackedProcess = topCpuConsumingNonTrackedProcess.get(0); // it will always be the only one
+		ProcessInfo newTrackedProcess = topCpuConsumingNonTrackedProcess.get(0); // there will be only one
 		System.out.println("New Tracked Process added: " + newTrackedProcess.getPid() + " to substitute killed one: " + killedProcessId);
-		topConsumingProcessesIds.add(newTrackedProcess.getPid());
-		trackedProcessesInfo.add(newTrackedProcess); // new one comes in here
-	}
 
+		// adding new one to track
+		uiProcessesIds.add(newTrackedProcess.getPid());
+
+		// in case killed process was tracked in ui list - do the same as above for ui list
+		boolean removed = uiProcessesIds.remove(killedProcessId);
+		if (removed) {
+			// need to update UI list now
+			uiProcessesIds.add(newTrackedProcess.getPid());
+		}
+	}
 }
