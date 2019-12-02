@@ -1,7 +1,6 @@
 package com.paka.processexplorer.controllers;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.paka.processexplorer.model.KillProcessMessage;
 import com.paka.processexplorer.model.SystemInfo;
 import com.paka.processexplorer.service.ProcessService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,12 +10,13 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 
+import static com.paka.processexplorer.config.WebSocketDestinations.*;
+
 @Controller
 public class ProcessController {
 
 	private boolean isPollingActive;
 	private final SimpMessagingTemplate simpMessagingTemplate;
-	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	@Autowired
 	ProcessService processService;
@@ -35,45 +35,43 @@ public class ProcessController {
 	 * If kill command failed just sends appropriate message to the client.
 	 * @param pid - process ID
 	 */
-	@MessageMapping("/kill-process/{pid}")
+	@MessageMapping(KILL_PROCESS)
 	public void killProcess(@DestinationVariable String pid) {
 		System.out.println("Request to kill process: " + pid);
 
 		boolean killSuccessful = processService.killProcess(pid);
 
+		KillProcessMessage kpm = new KillProcessMessage();
+
 		if (killSuccessful) {
-			processService.updateTopList(pid);
-			this.simpMessagingTemplate.convertAndSend("/topic/kill-successful", "Kill successful: " + pid);
+			String newProcessId = processService.updateUiProcessList(pid); // move to killProcess(...)?
+			kpm.setNewProcessId(newProcessId);
+			kpm.setKilledId(pid);
+			this.simpMessagingTemplate.convertAndSend(KILL_SUCCESSFUL, kpm);
 		} else {
-			this.simpMessagingTemplate.convertAndSend("/topic/kill-failed", "Kill failed: " + pid);
+			kpm.setNewProcessId(pid); // in case of killing failure send old PID
+			this.simpMessagingTemplate.convertAndSend(KILL_FAILED, kpm);
 		}
 	}
 
-	@MessageMapping("/start-process-polling")
+	@MessageMapping(START_PROCESS_POLLING)
 	public void startPolling() {
 		this.isPollingActive = true;
 	}
 
-	@MessageMapping("/stop-process-polling")
+	@MessageMapping(STOP_PROCESS_POLLING)
 	public void stopPolling() {
 		this.isPollingActive = false;
 	}
 
 	/**
-	 * Every second pushes a message with current "system state".
-	 *
-	 * @throws JsonProcessingException - just to be sure :)
+	 * Every second pushes a message with current "system state" to the client.
 	 */
 	@Scheduled(fixedDelay = 1000)
-	public void poll() throws JsonProcessingException {
+	public void poll() {
 		if (isPollingActive) {
 			SystemInfo info = processService.getCurrentSystemInfo();
-			System.out.println(info.getCurrentTime());
-			info.getUiProcesses().forEach((processDTO -> {
-				System.out.println(processDTO.getName() + ": " + processDTO.getTime());
-			}));
-			String processesBatchStr = objectMapper.writeValueAsString(info);
-			this.simpMessagingTemplate.convertAndSend("/topic/processes", processesBatchStr);
+			this.simpMessagingTemplate.convertAndSend(GET_ALL_PROCESSES, info);
 		}
 	}
 }

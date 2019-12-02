@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 @Service
 public class ProcessService {
 
-	private final int MAX_UI_PROCESSES = 10; // max no of trackedProcesses that will ever reach UI
+	private final int MAX_UI_PROCESSES = 5; // max no of trackedProcesses that will ever reach UI
 
 	/**
 	 * A list of processes that are tracked from the client side (ones that are shown on the chart)
@@ -33,17 +33,15 @@ public class ProcessService {
 	 * @return true if the kill was successful, false otherwise
 	 */
 	public boolean killProcess(String pid) {
-		boolean success = JProcesses.killProcess(Integer.valueOf(pid)).isSuccess();
-		return success;
+		return JProcesses.killProcess(Integer.valueOf(pid)).isSuccess();
 	}
 
 	/**
-	 * Maps the list of trackedProcesses into array of ids and stores
-	 * it into "UI tracked processes list"
+	 * Maps the list of trackedProcesses into array of ids and stores it into "UI tracked processes list"
 	 *
 	 * This method should be called only once
 	 */
-	private void updateTrackingList(List<ProcessInfo> processInfos) {
+	private void initTrackingList(List<ProcessInfo> processInfos) {
 		uiProcessesIds = processInfos.stream().sorted(Comparator.comparing(o -> -Double.valueOf(o.getCpuUsage())))
 				.limit(MAX_UI_PROCESSES).map(ProcessInfo::getPid).collect(Collectors.toList());
 	}
@@ -57,7 +55,7 @@ public class ProcessService {
 		List<ProcessInfo> allSystemProcessesList = JProcesses.getProcessList();
 
 		if (uiProcessesIds == null) { // this is called only once
-			updateTrackingList(allSystemProcessesList);
+			initTrackingList(allSystemProcessesList);
 		}
 
 		List<ProcessInfo> uiProcesses = allSystemProcessesList.stream().filter(processInfo ->
@@ -75,6 +73,7 @@ public class ProcessService {
 
 	public SystemInfo getCurrentSystemInfo() {
 		ProcessesData data = getProcessData();
+
 		List<ProcessDTO> trackedProcesses = processMapper.mapProcessesToProcessDto(data.getTrackedProcesses());
 		List<ProcessDTO> uiProcesses = processMapper.mapProcessesToProcessDto(data.getUiProcesses());
 
@@ -89,13 +88,13 @@ public class ProcessService {
 
 	/**
 	 * In case we kill a process we need to:
-	 * 1) remove that pid from topConsumingProcessesIds
-	 * 2) remove that pid from uiProcessesIds
-	 * 3) grab current running processes and put the top-consuming one which is not yet tracked to the tracked list
-	 * 4) if the killed one was in uiProcessesIds - do the same for it
 	 *
+	 * 1) in case if the ID was in uiProcessesIds - remove it
+	 * 2) grab current running processes and put the top-consuming one which is not yet tracked to the uiProcessesIds
+	 *
+	 * @return a PID of new process which substituted the killed one
 	 */
-	public void updateTopList(String killedProcessId) {
+	public String updateUiProcessList(String killedProcessId) {
 		// go through all processes and take the top CPU-consuming one
 		List<ProcessInfo> allProcessesList = JProcesses.getProcessList();
 
@@ -116,5 +115,6 @@ public class ProcessService {
 			// need to update UI list now
 			uiProcessesIds.add(newTrackedProcess.getPid());
 		}
+		return newTrackedProcess.getPid();
 	}
 }

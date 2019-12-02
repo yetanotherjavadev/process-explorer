@@ -12,6 +12,6 @@ import java.util.List;
 @NoArgsConstructor
 public class ProcessesData {
 	private List<ProcessInfo> trackedProcesses; // all system processes
-	private List<ProcessInfo> uiProcesses; // processes to be shown on graph
+	private List<ProcessInfo> uiProcesses; // processes to be shown in the chart
 	private Double overallCpuUsage;
 }

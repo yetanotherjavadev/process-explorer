@@ -6,18 +6,20 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import static com.paka.processexplorer.config.WebSocketDestinations.*;
+
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
-		registry.addEndpoint("/pe-websocket").setAllowedOrigins("*");
+		registry.addEndpoint(PROCESS_EXPLORER_WEBSOCKET).setAllowedOrigins("*");
 	}
 
 	@Override
 	public void configureMessageBroker(MessageBrokerRegistry config) {
-		config.setApplicationDestinationPrefixes("/app");
-		config.enableSimpleBroker("/topic");
+		config.setApplicationDestinationPrefixes(APP);
+		config.enableSimpleBroker(TOPIC);
 	}
 }

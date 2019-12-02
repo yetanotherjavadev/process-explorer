@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Converts internal process description classes to DTOs.
+ * Converts internal system process description classes to DTOs.
  */
 @Component
 public class ProcessMapper {

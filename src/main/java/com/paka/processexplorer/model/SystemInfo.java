@@ -7,12 +7,16 @@ import lombok.Setter;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * Main data transfer class.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
 public class SystemInfo implements Serializable {
 	private Long currentTime;
-	private List<ProcessDTO> trackedProcesses; // top-10 tracked processes
+	private List<ProcessDTO> trackedProcesses; // top-X tracked processes
 	private List<ProcessDTO> uiProcesses; // processes to be shown on UI
+	private ProcessesData data;
 	private Double overallCpuUsage;
 }
