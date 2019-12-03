@@ -67,7 +67,7 @@ public class ProcessController {
 	/**
 	 * Every second pushes a message with current "system state" to the client.
 	 */
-	@Scheduled(fixedDelay = 1000)
+	@Scheduled(fixedRate = 1000)
 	public void poll() {
 		if (isPollingActive) {
 			SystemInfo info = processService.getCurrentSystemInfo();

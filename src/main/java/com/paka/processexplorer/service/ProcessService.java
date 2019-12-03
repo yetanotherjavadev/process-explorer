@@ -33,7 +33,7 @@ public class ProcessService {
 	 * @return true if the kill was successful, false otherwise
 	 */
 	public boolean killProcess(String pid) {
-		return JProcesses.killProcess(Integer.valueOf(pid)).isSuccess();
+		return JProcesses.killProcess(Integer.parseInt(pid)).isSuccess();
 	}
 
 	/**
@@ -42,7 +42,8 @@ public class ProcessService {
 	 * This method should be called only once
 	 */
 	private void initTrackingList(List<ProcessInfo> processInfos) {
-		uiProcessesIds = processInfos.stream().sorted(Comparator.comparing(o -> -Double.valueOf(o.getCpuUsage())))
+		uiProcessesIds = processInfos.stream().filter(o -> o.getCpuUsage() != null).filter(p -> !"0".equals(p.getPid()))
+				.sorted(Comparator.comparing(o -> -Double.parseDouble(o.getCpuUsage())))
 				.limit(MAX_UI_PROCESSES).map(ProcessInfo::getPid).collect(Collectors.toList());
 	}
 
@@ -62,7 +63,8 @@ public class ProcessService {
 			uiProcessesIds.stream().anyMatch((id) -> processInfo.getPid().equals(id))
 		).collect(Collectors.toList());
 
-		double cpuUsageSum = allSystemProcessesList.stream().mapToDouble(p -> Double.valueOf(p.getCpuUsage())).sum();
+		double cpuUsageSum = Math.max(100, allSystemProcessesList.stream().filter(o -> o.getCpuUsage() != null)
+				.mapToDouble(p -> Double.parseDouble(p.getCpuUsage())).sum());
 
 		data.setOverallCpuUsage(cpuUsageSum);
 		data.setTrackedProcesses(allSystemProcessesList);
@@ -98,9 +100,10 @@ public class ProcessService {
 		// go through all processes and take the top CPU-consuming one
 		List<ProcessInfo> allProcessesList = JProcesses.getProcessList();
 
-		List<ProcessInfo> topCpuConsumingNonTrackedProcess = allProcessesList.stream().filter(processInfo ->
-				uiProcessesIds.stream().noneMatch((id) -> processInfo.getPid().equals(id))
-		).sorted(Comparator.comparing(o -> -Double.valueOf(o.getCpuUsage())))
+		List<ProcessInfo> topCpuConsumingNonTrackedProcess = allProcessesList.stream()
+				.filter(p -> !"0".equals(p.getPid()))
+				.filter(processInfo -> uiProcessesIds.stream().noneMatch((id) -> processInfo.getPid().equals(id)))
+				.filter(o -> o.getCpuUsage() != null).sorted(Comparator.comparing(o -> -Double.parseDouble(o.getCpuUsage())))
 				.limit(1).collect(Collectors.toList());
 
 		ProcessInfo newTrackedProcess = topCpuConsumingNonTrackedProcess.get(0); // there will be only one
