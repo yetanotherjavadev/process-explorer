@@ -15,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 public class SystemInfo implements Serializable {
 	private Long currentTime;
-	private List<ProcessDTO> trackedProcesses; // top-X tracked processes
+	private List<ProcessDTO> trackedProcesses; // top tracked processes
 	private List<ProcessDTO> uiProcesses; // processes to be shown on UI
 	private ProcessesData data;
 	private Double overallCpuUsage;
